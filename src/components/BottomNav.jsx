@@ -1,8 +1,8 @@
 const NAV_ITEMS = [
   { id: 'map', icon: 'fa-map', label: '地图' },
   { id: 'track', icon: 'fa-route', label: '轨迹' },
-  { id: 'pois', icon: 'fa-location-dot', label: '路标' },
-  { id: 'settings', icon: 'fa-shield-halved', label: '保活/离线' },
+  { id: 'history', icon: 'fa-clock-rotate-left', label: '历史轨迹' },
+  { id: 'settings', icon: 'fa-gear', label: '设置' },
 ];
 
 export function BottomNav({ activeTab, onChange }) {

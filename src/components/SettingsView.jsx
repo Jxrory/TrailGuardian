@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useNotifications } from '../hooks/useNotifications.jsx';
 import { tileCache } from '../services/storage.js';
 
 function Toggle({ checked, disabled, onChange }) {
@@ -23,20 +22,17 @@ function Toggle({ checked, disabled, onChange }) {
 }
 
 export function SettingsView({
-  lowPowerEnabled,
-  onLowPowerChange,
   audioKeepAliveEnabled,
-  onAudioKeepAliveChange,
-  pageHidden,
-  isRecording,
   cacheRevision,
-  onDownloadArea,
-  onCacheCleared,
+  isRecording,
+  lowPowerEnabled,
+  offlineMapCount,
+  onAudioKeepAliveChange,
+  onLowPowerChange,
+  onOpenOfflineMaps,
+  pageHidden,
 }) {
-  const { notify } = useNotifications();
   const [cacheCount, setCacheCount] = useState(null);
-  const [downloading, setDownloading] = useState(false);
-  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,53 +44,24 @@ export function SettingsView({
     };
   }, [cacheRevision]);
 
-  const downloadArea = async () => {
-    setDownloading(true);
-    setProgress(0);
-    try {
-      const result = await onDownloadArea(setProgress);
-      if (!result?.ok) {
-        notify(result?.message ?? '离线包下载失败', 'error');
-        return;
-      }
-      if (result.failed > 0) {
-        notify(
-          `离线包完成：新增 ${result.downloaded} 张，复用 ${result.cached} 张，${result.failed} 张失败`,
-          'info',
-          5000,
-        );
-      } else {
-        notify(
-          `离线包完成：共 ${result.total} 张瓦片，新增 ${result.downloaded} 张`,
-          'success',
-        );
-      }
-      setCacheCount(await tileCache.countTiles());
-    } finally {
-      setDownloading(false);
-      setProgress(0);
-    }
-  };
-
-  const clearCache = async () => {
-    await tileCache.clearTiles();
-    setCacheCount(0);
-    onCacheCleared?.();
-    notify('离线地图缓存已清空', 'success');
-  };
-
-  const cacheSizeMb = cacheCount === null ? '--' : ((cacheCount * 26) / 1024).toFixed(1);
   const sampleRate = pageHidden
     ? '10s / 息屏'
     : lowPowerEnabled
       ? '3s / 运动态'
       : '1.5s / 高性能';
+  const cacheSizeMb =
+    cacheCount === null ? '--' : ((cacheCount * 24) / 1024).toFixed(1);
 
   return (
     <section className="absolute inset-0 flex flex-col overflow-y-auto bg-slate-900 p-4">
-      <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-emerald-400">
-        <i className="fa-solid fa-shield-halved" /> 息屏保活与离线中心
-      </h2>
+      <div className="mb-4">
+        <div className="text-[10px] font-semibold uppercase tracking-widest text-emerald-500/80">
+          TrailGuardian
+        </div>
+        <h2 className="flex items-center gap-2 text-xl font-bold text-emerald-400">
+          <i className="fa-solid fa-gear" /> 设置
+        </h2>
+      </div>
 
       <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-emerald-800/60 bg-slate-800/90 p-4 shadow-lg">
         <div className="flex items-center justify-between">
@@ -152,50 +119,31 @@ export function SettingsView({
         <Toggle checked={lowPowerEnabled} onChange={onLowPowerChange} />
       </div>
 
-      <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-700 bg-slate-800/80 p-4">
-        <div className="flex items-center justify-between">
-          <div className="text-sm font-semibold text-slate-200">
-            离线卫星与等高线瓦片库
+      <button
+        className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-slate-700 bg-slate-800/80 p-4 text-left transition hover:border-emerald-800 hover:bg-slate-800"
+        onClick={onOpenOfflineMaps}
+        type="button"
+      >
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">
+            <i className="fa-solid fa-layer-group text-emerald-400" /> 离线地图
           </div>
-          <span className="rounded-full border border-emerald-800 bg-emerald-950/60 px-2.5 py-1 text-xs text-emerald-400">
+          <div className="mt-1 text-xs leading-relaxed text-slate-400">
+            独立圈选区域、选择层级并管理离线瓦片包
+          </div>
+          <div className="mt-2 text-[10px] text-emerald-400">
+            {offlineMapCount} 个离线区域 · 缓存{' '}
             {cacheCount === null ? '计算中…' : `${cacheCount} 张 · ${cacheSizeMb} MB`}
-          </span>
-        </div>
-        <div className="text-xs leading-relaxed text-slate-400">
-          在有网时下载当前视野的底图与等高线瓦片。进山断网后，已缓存的区域仍可正常显示。
-        </div>
-        {(downloading || progress > 0) && (
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-700">
-            <div
-              className="h-1.5 rounded-full bg-emerald-500 transition-all duration-200"
-              style={{ width: `${progress}%` }}
-            />
           </div>
-        )}
-        <div className="mt-1 flex gap-2">
-          <button
-            className="rounded-xl border border-rose-800/60 bg-rose-950/40 px-4 py-2.5 text-xs font-semibold text-rose-300 transition hover:bg-rose-900/50"
-            onClick={clearCache}
-            type="button"
-          >
-            清空缓存
-          </button>
-          <button
-            className="flex-1 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-wait disabled:opacity-60"
-            disabled={downloading}
-            onClick={downloadArea}
-            type="button"
-          >
-            {downloading ? `下载中 ${progress}%` : '批量下载当前区域离线包'}
-          </button>
         </div>
-      </div>
+        <i className="fa-solid fa-chevron-right shrink-0 text-slate-500" />
+      </button>
 
       <div className="mb-16 mt-auto flex flex-col gap-1.5 rounded-2xl border border-slate-700/60 bg-slate-800/50 p-4 text-xs text-slate-400">
         <div className="font-semibold text-slate-300">
           野径户外助手 · TrailGuardian v2.0
         </div>
-        <div>React + Vite + Leaflet，支持等高线、GPX、轨迹记录、路标和离线瓦片。</div>
+        <div>React + Vite + Leaflet，支持工作空间、等高线、GPX、轨迹和离线地图。</div>
         <div>等高线由 AWS Terrain 高程数据在本地生成，首次访问需要联网。</div>
       </div>
     </section>

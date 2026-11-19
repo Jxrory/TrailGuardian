@@ -11,6 +11,7 @@ const SNAPSHOT_DELAY_MS = 700;
 export function useTrailRecorder({
   lowPowerEnabled,
   audioKeepAliveEnabled,
+  workspaceId,
   notify,
 }) {
   const [points, setPoints] = useState([]);
@@ -44,16 +45,22 @@ export function useTrailRecorder({
   const stationaryCountRef = useRef(0);
   const snapshotTimerRef = useRef(null);
   const permissionWarningShownRef = useRef(false);
+  const workspaceIdRef = useRef(workspaceId);
 
   useEffect(() => {
     lowPowerRef.current = lowPowerEnabled;
   }, [lowPowerEnabled]);
+
+  useEffect(() => {
+    workspaceIdRef.current = workspaceId;
+  }, [workspaceId]);
 
   const queueSnapshot = useCallback(() => {
     if (!isRecordingRef.current || pointsRef.current.length === 0) return;
     window.clearTimeout(snapshotTimerRef.current);
     snapshotTimerRef.current = window.setTimeout(() => {
       sessionStore.save({
+        workspaceId: workspaceIdRef.current,
         sessionStartTime: sessionStartRef.current,
         accumulatedPausedMs: accumulatedPausedMsRef.current,
         totalDistance: totalDistanceRef.current,
@@ -266,6 +273,7 @@ export function useTrailRecorder({
   }, []);
 
   const start = useCallback(() => {
+    workspaceIdRef.current = workspaceId;
     pointsRef.current = [];
     totalDistanceRef.current = 0;
     totalElevationGainRef.current = 0;
@@ -287,7 +295,7 @@ export function useTrailRecorder({
     setMotionState('MOVING');
     sessionStore.clear();
     notify('开始记录轨迹', 'success');
-  }, [currentElevation, notify]);
+  }, [currentElevation, notify, workspaceId]);
 
   const togglePause = useCallback(() => {
     if (!isRecordingRef.current) return;
@@ -330,6 +338,11 @@ export function useTrailRecorder({
       distance: (totalDistanceRef.current / 1000).toFixed(2),
       eleGain: Math.round(totalElevationGainRef.current),
       time: formatDuration(durationMs / 1000),
+      durationSeconds: Math.round(durationMs / 1000),
+      distanceMeters: totalDistanceRef.current,
+      elevationGain: totalElevationGainRef.current,
+      startedAt: sessionStartRef.current,
+      finishedAt: Date.now(),
       points: savedPoints,
       createdAt: Date.now(),
     };

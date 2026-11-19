@@ -94,6 +94,12 @@ export const tileCache = {
   async clearTiles() {
     await withTileStore('readwrite', (store) => store.clear());
   },
+
+  async deleteTiles(urls = []) {
+    await withTileStore('readwrite', (store) => {
+      for (const url of urls) store.delete(url);
+    });
+  },
 };
 
 export const sessionStore = {

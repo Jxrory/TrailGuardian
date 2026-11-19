@@ -35,6 +35,7 @@ const POI_META = {
   water: { icon: 'fa-droplet', color: '#3b82f6', label: '水源' },
   danger: { icon: 'fa-triangle-exclamation', color: '#ef4444', label: '危险' },
   view: { icon: 'fa-mountain-sun', color: '#f59e0b', label: '观景' },
+  marker: { icon: 'fa-location-dot', color: '#8b5cf6', label: '标注' },
 };
 
 const CONTOUR_STATUS_LABEL = {
@@ -228,8 +229,9 @@ export const MapView = forwardRef(function MapView(
     onToggleContour,
     contourOpacity,
     onContourOpacityChange,
-    trackPoints,
-    displayedTrack,
+    targetTrack,
+    recordedTrack,
+    focusTrack,
     pois,
     currentPosition,
     currentElevation,
@@ -394,7 +396,7 @@ export const MapView = forwardRef(function MapView(
         zoomControl={false}
       >
         <MapReady onReady={setMapInstance} />
-        <TrackFocusController focusTrack={displayedTrack} isActive={isActive} />
+        <TrackFocusController focusTrack={focusTrack} isActive={isActive} />
 
         <ManagedTileLayer
           attribution={mapSource.attribution}
@@ -425,36 +427,75 @@ export const MapView = forwardRef(function MapView(
           />
         )}
 
-        {displayedTrack?.points?.length > 1 && (
+        {targetTrack?.points?.length > 1 && (
           <>
             <Polyline
               pathOptions={{
-                color: displayedTrack.color ?? '#f59e0b',
-                weight: 4,
-                opacity: 0.9,
+                color: '#38bdf8',
+                dashArray: '7 6',
+                weight: 3,
+                opacity: 0.92,
               }}
-              positions={displayedTrack.points.map((point) => [
+              positions={targetTrack.points.map((point) => [
                 point.lat,
                 point.lng,
               ])}
             />
             <CircleMarker
-              center={[displayedTrack.points[0].lat, displayedTrack.points[0].lng]}
+              center={[targetTrack.points[0].lat, targetTrack.points[0].lng]}
               pathOptions={{
-                color: displayedTrack.color ?? '#f59e0b',
-                fillColor: displayedTrack.color ?? '#f59e0b',
+                color: '#38bdf8',
+                fillColor: '#38bdf8',
                 fillOpacity: 0.9,
+              }}
+              radius={7}
+            />
+            <CircleMarker
+              center={[
+                targetTrack.points.at(-1).lat,
+                targetTrack.points.at(-1).lng,
+              ]}
+              pathOptions={{
+                color: '#38bdf8',
+                fillColor: '#0f172a',
+                fillOpacity: 0.95,
               }}
               radius={7}
             />
           </>
         )}
 
-        {trackPoints.length > 1 && (
-          <Polyline
-            pathOptions={{ color: '#10b981', weight: 4, opacity: 0.95 }}
-            positions={trackPoints.map((point) => [point.lat, point.lng])}
-          />
+        {recordedTrack?.points?.length > 1 && (
+          <>
+            <Polyline
+              pathOptions={{ color: '#10b981', weight: 4, opacity: 0.95 }}
+              positions={recordedTrack.points.map((point) => [
+                point.lat,
+                point.lng,
+              ])}
+            />
+            <CircleMarker
+              center={[recordedTrack.points[0].lat, recordedTrack.points[0].lng]}
+              pathOptions={{
+                color: '#10b981',
+                fillColor: '#10b981',
+                fillOpacity: 0.95,
+              }}
+              radius={6}
+            />
+            <CircleMarker
+              center={[
+                recordedTrack.points.at(-1).lat,
+                recordedTrack.points.at(-1).lng,
+              ]}
+              pathOptions={{
+                color: '#10b981',
+                fillColor: '#0f172a',
+                fillOpacity: 0.95,
+              }}
+              radius={6}
+            />
+          </>
         )}
 
         {poiMarkers.map((poi) => (
@@ -580,6 +621,18 @@ export const MapView = forwardRef(function MapView(
             <span className="h-px w-4 bg-slate-300/80" /> 五十米
           </div>
         )}
+        <div className="flex flex-col gap-1.5 border-t border-slate-700/70 pt-2 text-[9px] text-slate-400">
+          <span className="flex items-center gap-2">
+            <span
+              className="h-0.5 w-5 border-t-2 border-dashed"
+              style={{ borderColor: '#38bdf8' }}
+            />
+            目标运动路径
+          </span>
+          <span className="flex items-center gap-2">
+            <span className="h-0.5 w-5 bg-emerald-500" /> 已走路径
+          </span>
+        </div>
       </div>
 
       <div className="absolute right-3 top-3 z-20 flex flex-col gap-2">

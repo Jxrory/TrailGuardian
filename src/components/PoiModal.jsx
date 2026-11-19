@@ -5,6 +5,7 @@ const POI_OPTIONS = [
   { value: 'water', label: '💧 水源点' },
   { value: 'danger', label: '⚠️ 危险点' },
   { value: 'view', label: '👁️ 观景台' },
+  { value: 'marker', label: '📍 其他标注点' },
 ];
 
 export function PoiModal({ open, anchor, onClose, onSave }) {
