@@ -14,25 +14,10 @@ export const BASE_MAP_SOURCES = [
     maxNativeZoom: 19,
     attribution: 'Tiles &copy; Esri',
   },
-  {
-    id: 'osm',
-    label: 'OSM 标准',
-    shortLabel: 'OSM 标准',
-    baseUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    overlayUrls: [],
-    maxZoom: 19,
-    maxNativeZoom: 19,
-    attribution: '&copy; OpenStreetMap contributors',
-  },
 ];
 
 export function getMapSource(id) {
   return BASE_MAP_SOURCES.find((source) => source.id === id) ?? BASE_MAP_SOURCES[0];
-}
-
-export function nextMapSource(id) {
-  const currentIndex = BASE_MAP_SOURCES.findIndex((source) => source.id === id);
-  return BASE_MAP_SOURCES[(currentIndex + 1) % BASE_MAP_SOURCES.length];
 }
 
 function expandTileUrl(template, z, x, y, subdomains = []) {

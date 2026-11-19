@@ -232,6 +232,7 @@ function createPoiIcon(meta) {
 
 function UserPositionMarker({ heading, icon, position, zIndexOffset, children }) {
   const markerRef = useRef(null);
+  const displayedHeadingRef = useRef(null);
 
   useEffect(() => {
     const markerElement = markerRef.current?.getElement();
@@ -239,7 +240,22 @@ function UserPositionMarker({ heading, icon, position, zIndexOffset, children })
     if (!arrow) return;
 
     const hasHeading = Number.isFinite(heading);
-    arrow.style.transform = `rotate(${hasHeading ? heading : 0}deg)`;
+    let displayedHeading = displayedHeadingRef.current;
+
+    if (hasHeading) {
+      if (displayedHeading === null) {
+        displayedHeading = heading;
+      } else {
+        const normalizedDisplayed = ((displayedHeading % 360) + 360) % 360;
+        const delta = ((heading - normalizedDisplayed + 540) % 360) - 180;
+        displayedHeading += delta;
+      }
+      displayedHeadingRef.current = displayedHeading;
+    }
+
+    arrow.style.transform = `rotate(${
+      hasHeading ? displayedHeading ?? heading : 0
+    }deg)`;
     arrow.classList.toggle('user-compass-arrow--unknown', !hasHeading);
   }, [heading]);
 
@@ -259,7 +275,6 @@ export const MapView = forwardRef(function MapView(
   {
     isActive,
     mapSourceId,
-    onCycleMapSource,
     contourEnabled,
     onToggleContour,
     contourOpacity,
@@ -595,23 +610,33 @@ export const MapView = forwardRef(function MapView(
         )}
       </MapContainer>
 
-      <div className="absolute right-3 top-3 z-20 flex items-start justify-end gap-2">
+      <div className="absolute left-3 top-3 z-20 flex w-52 flex-col items-start gap-2">
+        <button
+          aria-controls="map-info-panel"
+          aria-expanded={isMapInfoOpen}
+          className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900/90 px-2.5 py-2 text-[11px] font-semibold text-slate-200 shadow-lg backdrop-blur transition active:scale-95"
+          onClick={() => setIsMapInfoOpen((open) => !open)}
+          title="地图信息"
+          type="button"
+        >
+          <i className="fa-solid fa-satellite-dish text-xs text-emerald-400" />
+          <span>{mapSource.shortLabel}</span>
+          <i
+            className={`fa-solid ${
+              isMapInfoOpen ? 'fa-chevron-up' : 'fa-chevron-down'
+            } text-[8px] text-slate-400`}
+          />
+        </button>
+
         {isMapInfoOpen && (
           <div
-            className="max-h-[65vh] w-52 overflow-y-auto rounded-xl border border-slate-700/90 bg-slate-900/95 p-2.5 shadow-xl backdrop-blur"
+            className="max-h-[65vh] w-full overflow-y-auto rounded-xl border border-slate-700/90 bg-slate-900/95 p-2.5 shadow-xl backdrop-blur"
             id="map-info-panel"
           >
             <div className="flex items-center justify-between gap-2 border-b border-slate-700/80 pb-1.5">
               <span className="truncate text-[11px] font-bold text-emerald-400">
-                {mapSource.label}
+                地图信息
               </span>
-              <button
-                className="shrink-0 rounded border border-emerald-700/80 bg-emerald-950/90 px-2 py-0.5 text-[10px] text-emerald-300 transition hover:bg-emerald-900"
-                onClick={onCycleMapSource}
-                type="button"
-              >
-                切换图源
-              </button>
             </div>
 
             <div className="mt-2 flex items-center justify-between gap-2">
@@ -698,58 +723,34 @@ export const MapView = forwardRef(function MapView(
             </div>
           </div>
         )}
+      </div>
 
-        <div className="flex flex-col gap-2">
-          <button
-            aria-controls="map-info-panel"
-            aria-expanded={isMapInfoOpen}
-            className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900/90 px-2.5 py-2 text-[11px] font-semibold text-slate-200 shadow-lg backdrop-blur transition active:scale-95"
-            onClick={() => setIsMapInfoOpen((open) => !open)}
-            title="地图信息"
-            type="button"
-          >
-            <i className="fa-solid fa-satellite-dish text-xs text-emerald-400" />
-            <span>{mapSource.shortLabel}</span>
-            <i
-              className={`fa-solid ${
-                isMapInfoOpen ? 'fa-chevron-up' : 'fa-chevron-down'
-              } text-[8px] text-slate-400`}
-            />
-          </button>
-          <button
-            className="rounded-xl border border-slate-700 bg-slate-900/90 p-3 text-emerald-400 shadow-lg backdrop-blur transition active:scale-95"
-            onClick={onCycleMapSource}
-            title="切换图源"
-            type="button"
-          >
-            <i className="fa-solid fa-layer-group text-lg" />
-          </button>
-          <button
-            className="rounded-xl border border-slate-700 bg-slate-900/90 p-3 text-emerald-400 shadow-lg backdrop-blur transition active:scale-95"
-            onClick={() => {
-              if (mapInstance && currentPosition) {
-                mapInstance.setView(
-                  [currentPosition.lat, currentPosition.lng],
-                  Math.max(mapInstance.getZoom(), 16),
-                );
-              } else {
-                onLocateRequest?.();
-              }
-            }}
-            title="定位当前"
-            type="button"
-          >
-            <i className="fa-solid fa-crosshairs text-lg" />
-          </button>
-          <button
-            className="rounded-xl border border-slate-700 bg-slate-900/90 p-3 text-amber-400 shadow-lg backdrop-blur transition active:scale-95"
-            onClick={() => onOpenPoi?.()}
-            title="打点营地/水源"
-            type="button"
-          >
-            <i className="fa-solid fa-map-pin text-lg" />
-          </button>
-        </div>
+      <div className="absolute right-3 top-3 z-20 flex flex-col gap-2">
+        <button
+          className="rounded-xl border border-slate-700 bg-slate-900/90 p-3 text-emerald-400 shadow-lg backdrop-blur transition active:scale-95"
+          onClick={() => {
+            if (mapInstance && currentPosition) {
+              mapInstance.setView(
+                [currentPosition.lat, currentPosition.lng],
+                Math.max(mapInstance.getZoom(), 16),
+              );
+            } else {
+              onLocateRequest?.();
+            }
+          }}
+          title="定位当前"
+          type="button"
+        >
+          <i className="fa-solid fa-crosshairs text-lg" />
+        </button>
+        <button
+          className="rounded-xl border border-slate-700 bg-slate-900/90 p-3 text-amber-400 shadow-lg backdrop-blur transition active:scale-95"
+          onClick={() => onOpenPoi?.()}
+          title="打点营地/水源"
+          type="button"
+        >
+          <i className="fa-solid fa-map-pin text-lg" />
+        </button>
       </div>
 
       {currentElevation !== null && (

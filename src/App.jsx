@@ -19,7 +19,7 @@ import { usePersistentState } from './hooks/usePersistentState.js';
 import { useTrailRecorder } from './hooks/useTrailRecorder.js';
 import { formatDuration } from './services/geo.js';
 import { downloadGpx } from './services/gpx.js';
-import { getMapSource, nextMapSource } from './services/mapLayers.js';
+import { getMapSource } from './services/mapLayers.js';
 import {
   buildOfflineUrls,
   downloadOfflineTiles,
@@ -168,11 +168,10 @@ function TrailGuardianApp() {
     );
   };
 
-  const cycleMapSource = () => {
-    const next = nextMapSource(mapSourceId);
-    setMapSourceId(next.id);
-    notify(`已切换图源：${next.label}`, 'info');
-  };
+  useEffect(() => {
+    const source = getMapSource(mapSourceId);
+    if (mapSourceId !== source.id) setMapSourceId(source.id);
+  }, [mapSourceId, setMapSourceId]);
 
   const openWorkspaceCreate = () => {
     if (recorder.isRecording) {
@@ -527,7 +526,6 @@ function TrailGuardianApp() {
             isActive={activeTab === 'map'}
             mapSourceId={mapSourceId}
             onContourOpacityChange={setContourOpacity}
-            onCycleMapSource={cycleMapSource}
             onLocateRequest={() => notify('正在等待 GPS 定位…', 'info')}
             onOpenPoi={openPoiModal}
             onToggleContour={setContourEnabled}
