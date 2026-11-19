@@ -84,6 +84,21 @@ function TrailGuardianApp() {
     [activeWorkspaceId, workspaces],
   );
 
+  const workspaceOfflineMap = useMemo(() => {
+    if (!activeWorkspace) return null;
+    const directMatch = offlineMaps.find(
+      (region) => region.workspaceId === activeWorkspace.id,
+    );
+    if (directMatch) return directMatch;
+    return (
+      offlineMaps.find(
+        (region) =>
+          region.status === 'ready' &&
+          region.name === `${activeWorkspace.name} 离线地图`,
+      ) ?? null
+    );
+  }, [activeWorkspace, offlineMaps]);
+
   const recorder = useTrailRecorder({
     audioKeepAliveEnabled,
     lowPowerEnabled,
@@ -344,6 +359,7 @@ function TrailGuardianApp() {
       key: Date.now(),
       points: getWorkspaceFocusPoints(activeWorkspace),
       startPicker: false,
+      workspaceId: null,
     });
     setActiveTab('offline');
   };
@@ -354,19 +370,27 @@ function TrailGuardianApp() {
       return;
     }
     offlineReturnTabRef.current = 'track';
+    const existingMap = workspaceOfflineMap;
     setOfflineFocusRequest({
+      initialIncludeContour: existingMap?.includeContour ?? false,
+      initialName: existingMap?.name ?? '',
+      initialSelection: existingMap?.points ?? [],
+      initialZooms: existingMap?.zooms ?? null,
       key: Date.now(),
       points: getWorkspaceFocusPoints(activeWorkspace),
+      replaceMapId: existingMap?.id ?? null,
       startPicker: true,
+      workspaceId: activeWorkspace.id,
     });
     setActiveTab('offline');
   };
 
-  const addOfflineMap = (regionInput) => {
+  const addOfflineMap = async (regionInput) => {
     const id = `offline-${Date.now()}`;
     const source = getMapSource(regionInput.sourceId);
+    const { replaceMapId, ...regionData } = regionInput;
     const record = {
-      ...regionInput,
+      ...regionData,
       id,
       createdAt: Date.now(),
       downloadedTiles: 0,
@@ -374,6 +398,9 @@ function TrailGuardianApp() {
       sizeBytes: 0,
       status: 'downloading',
     };
+    const replacedRegion = replaceMapId
+      ? offlineMaps.find((region) => region.id === replaceMapId)
+      : null;
     const urls = buildOfflineUrls({
       bounds: regionInput.bounds,
       includeContour: regionInput.includeContour,
@@ -381,7 +408,21 @@ function TrailGuardianApp() {
       zooms: regionInput.zooms,
     });
 
-    setOfflineMaps((current) => [record, ...current]);
+    setOfflineMaps((current) => [
+      record,
+      ...current.filter((region) => region.id !== replaceMapId),
+    ]);
+
+    if (replacedRegion) {
+      const replacedSource = getMapSource(replacedRegion.sourceId);
+      const replacedUrls = buildOfflineUrls({
+        bounds: replacedRegion.bounds,
+        includeContour: replacedRegion.includeContour,
+        source: replacedSource,
+        zooms: replacedRegion.zooms,
+      });
+      await tileCache.deleteTiles(replacedUrls);
+    }
 
     downloadOfflineTiles(urls, (progress) => {
       setOfflineMaps((current) =>
@@ -518,6 +559,7 @@ function TrailGuardianApp() {
             onOpenOffline={openOfflinePickerForWorkspace}
             onPause={() => recorder.togglePause()}
             onStart={startRecording}
+            offlineMap={workspaceOfflineMap}
             points={recorder.points}
             workspace={activeWorkspace}
           />
@@ -561,7 +603,9 @@ function TrailGuardianApp() {
             onBack={() => setActiveTab(offlineReturnTabRef.current)}
             onClearOfflineMaps={clearOfflineMaps}
             onDeleteOfflineMap={deleteOfflineMap}
+            replaceMapId={offlineFocusRequest?.replaceMapId ?? null}
             suggestedName={activeWorkspace?.name}
+            workspaceId={offlineFocusRequest?.workspaceId ?? null}
           />
         )}
       </main>

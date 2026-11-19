@@ -63,6 +63,7 @@ export function WorkspaceView({
   onPause,
   onStart,
   onAddPoi,
+  offlineMap,
   points,
   workspace,
 }) {
@@ -110,6 +111,8 @@ export function WorkspaceView({
     ? elapsedSeconds
     : recordedTrack?.durationSeconds ?? 0;
   const visiblePointCount = isRecording ? points.length : recordedTrack?.points?.length ?? 0;
+  const offlineReady = offlineMap?.status === 'ready';
+  const offlineDownloading = offlineMap?.status === 'downloading';
 
   const importTargetFile = (event) => {
     const file = event.target.files?.[0];
@@ -387,15 +390,25 @@ export function WorkspaceView({
         <div>
           <div className="text-sm font-semibold text-slate-200">离线地图</div>
           <div className="mt-1 text-[10px] text-slate-500">
-            进入区域选择，并自动定位到目标路径附近
+            {offlineReady
+              ? `已下载：${offlineMap.name} · ${offlineMap.tileCount} 张瓦片`
+              : offlineDownloading
+                ? `正在下载：${offlineMap.progress ?? 0}%`
+                : '进入区域选择，并自动定位到目标路径附近'}
           </div>
         </div>
         <button
-          className="shrink-0 rounded-xl bg-slate-700 px-3 py-2.5 text-xs font-semibold text-emerald-300 hover:bg-slate-600"
+          className="shrink-0 rounded-xl bg-slate-700 px-3 py-2.5 text-xs font-semibold text-emerald-300 hover:bg-slate-600 disabled:cursor-wait disabled:opacity-50"
+          disabled={offlineDownloading}
           onClick={onOpenOffline}
           type="button"
         >
-          <i className="fa-solid fa-download" /> 下载离线地图
+          <i className="fa-solid fa-download" />
+          {offlineReady
+            ? '重新下载'
+            : offlineDownloading
+              ? `下载中 ${offlineMap.progress ?? 0}%`
+              : '下载离线地图'}
         </button>
       </div>
 

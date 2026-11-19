@@ -105,7 +105,9 @@ export function OfflineMapView({
   onBack,
   onClearOfflineMaps,
   onDeleteOfflineMap,
+  replaceMapId,
   suggestedName,
+  workspaceId,
 }) {
   const [mode, setMode] = useState('list');
   const [selection, setSelection] = useState([]);
@@ -119,8 +121,14 @@ export function OfflineMapView({
 
   useEffect(() => {
     if (!focusRequest?.key) return;
-    setSelection([]);
-    setZoneName('');
+    setSelection(focusRequest.initialSelection ?? []);
+    setZoneName(focusRequest.initialName ?? '');
+    if (focusRequest.initialZooms?.length) {
+      setSelectedZooms(focusRequest.initialZooms);
+    } else {
+      setSelectedZooms(DEFAULT_OFFLINE_ZOOMS);
+    }
+    setIncludeContour(Boolean(focusRequest.initialIncludeContour));
     setMode(focusRequest.startPicker ? 'select' : 'list');
   }, [focusRequest?.key, focusRequest?.startPicker]);
 
@@ -205,8 +213,10 @@ export function OfflineMapView({
       includeContour,
       name: zoneName.trim(),
       points: selection,
+      replaceMapId,
       sourceId: mapSourceId,
       tileCount: plan.tileCount,
+      workspaceId,
       zooms: selectedZooms,
     });
     notify('离线地图已加入下载队列', 'info');
