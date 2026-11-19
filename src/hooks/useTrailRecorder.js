@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { distanceInMeters, formatDuration, formatTrackDate } from '../services/geo.js';
+import {
+  distanceInMeters,
+  formatDuration,
+  formatTrackDate,
+} from '../services/geo.js';
 import {
   startBackgroundKeepAlive,
   stopBackgroundKeepAlive,
@@ -116,7 +120,6 @@ export function useTrailRecorder({
         lng,
         accuracy,
         speed,
-        heading: position.coords.heading,
         timestamp: now,
       });
       setCurrentElevation(elevation);

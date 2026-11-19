@@ -26,6 +26,7 @@ import {
   ContourTileLayer,
 } from '../services/contourTileLayer.js';
 import { tileCache } from '../services/storage.js';
+import { useCompassHeading } from '../hooks/useCompassHeading.js';
 
 const DEFAULT_CENTER = [30.245, 120.125];
 const MAX_OFFLINE_TILES = 900;
@@ -44,6 +45,15 @@ const CONTOUR_STATUS_LABEL = {
   ready: '等高线已显示',
   error: '地形数据加载失败，请检查网络',
 };
+
+const CARDINAL_LABELS = ['北', '东北', '东', '东南', '南', '西南', '西', '西北'];
+
+function describeHeading(heading) {
+  if (!Number.isFinite(heading)) return '方向待获取';
+  const normalized = ((heading % 360) + 360) % 360;
+  const direction = CARDINAL_LABELS[Math.round(normalized / 45) % 8];
+  return `${direction} ${Math.round(normalized)}°`;
+}
 
 function ManagedTileLayer({
   url,
@@ -220,6 +230,31 @@ function createPoiIcon(meta) {
   });
 }
 
+function UserPositionMarker({ heading, icon, position, zIndexOffset, children }) {
+  const markerRef = useRef(null);
+
+  useEffect(() => {
+    const markerElement = markerRef.current?.getElement();
+    const arrow = markerElement?.querySelector('.user-compass-arrow');
+    if (!arrow) return;
+
+    const hasHeading = Number.isFinite(heading);
+    arrow.style.transform = `rotate(${hasHeading ? heading : 0}deg)`;
+    arrow.classList.toggle('user-compass-arrow--unknown', !hasHeading);
+  }, [heading]);
+
+  return (
+    <Marker
+      icon={icon}
+      position={position}
+      ref={markerRef}
+      zIndexOffset={zIndexOffset}
+    >
+      {children}
+    </Marker>
+  );
+}
+
 export const MapView = forwardRef(function MapView(
   {
     isActive,
@@ -242,7 +277,10 @@ export const MapView = forwardRef(function MapView(
 ) {
   const [mapInstance, setMapInstance] = useState(null);
   const [contourStatus, setContourStatus] = useState('loading');
+  const [isMapInfoOpen, setIsMapInfoOpen] = useState(false);
   const mapSource = getMapSource(mapSourceId);
+  const deviceHeading = useCompassHeading(isActive);
+  const userHeading = Number.isFinite(deviceHeading) ? deviceHeading : null;
 
   const poiMarkers = useMemo(
     () =>
@@ -260,10 +298,16 @@ export const MapView = forwardRef(function MapView(
   const userIcon = useMemo(
     () =>
       L.divIcon({
-        className: 'user-position-marker',
-        html: '<div class="h-4 w-4 rounded-full border-2 border-white bg-emerald-500 shadow-lg"></div>',
-        iconSize: [18, 18],
-        iconAnchor: [9, 9],
+        className: 'user-position-marker user-compass-marker',
+        html: `<div class="user-compass-pulse"></div>
+          <div class="user-compass-ring">
+            <span class="user-compass-north">N</span>
+            <span class="user-compass-arrow user-compass-arrow--unknown"></span>
+            <span class="user-compass-dot"></span>
+          </div>`,
+        iconSize: [64, 64],
+        iconAnchor: [32, 32],
+        popupAnchor: [0, -24],
       }),
     [],
   );
@@ -271,6 +315,10 @@ export const MapView = forwardRef(function MapView(
   useEffect(() => {
     setContourStatus(contourEnabled ? 'loading' : 'idle');
   }, [contourEnabled]);
+
+  useEffect(() => {
+    if (!isActive) setIsMapInfoOpen(false);
+  }, [isActive]);
 
   useImperativeHandle(
     ref,
@@ -524,151 +572,184 @@ export const MapView = forwardRef(function MapView(
               }}
               radius={Math.min(currentPosition.accuracy || 20, 200)}
             />
-            <Marker
+            <UserPositionMarker
+              heading={userHeading}
               icon={userIcon}
               position={[currentPosition.lat, currentPosition.lng]}
+              zIndexOffset={1000}
             >
               <Popup>
-                <div className="text-xs text-slate-700">
-                  精度约 {Math.round(currentPosition.accuracy || 0)} m
-                  {currentElevation !== null && ` · 海拔 ${currentElevation} m`}
+                <div className="min-w-36 text-slate-700">
+                  <div className="font-semibold">我的位置</div>
+                  <div className="mt-1 text-xs text-slate-600">
+                    朝向 {describeHeading(userHeading)}
+                  </div>
+                  <div className="text-xs text-slate-600">
+                    精度约 {Math.round(currentPosition.accuracy || 0)} m
+                    {currentElevation !== null && ` · 海拔 ${currentElevation} m`}
+                  </div>
                 </div>
               </Popup>
-            </Marker>
+            </UserPositionMarker>
           </>
         )}
       </MapContainer>
 
-      <div className="absolute left-3 top-3 z-20 flex w-52 flex-col gap-2 rounded-xl border border-slate-700/90 bg-slate-900/90 p-2.5 shadow-lg backdrop-blur">
-        <div className="flex items-center justify-between gap-2 border-b border-slate-700/80 pb-1.5">
-          <span className="truncate text-[11px] font-bold text-emerald-400">
-            {mapSource.label}
-          </span>
-          <button
-            className="shrink-0 rounded border border-emerald-700/80 bg-emerald-950/90 px-2 py-0.5 text-[10px] text-emerald-300 transition hover:bg-emerald-900"
-            onClick={onCycleMapSource}
-            type="button"
+      <div className="absolute right-3 top-3 z-20 flex items-start justify-end gap-2">
+        {isMapInfoOpen && (
+          <div
+            className="max-h-[65vh] w-52 overflow-y-auto rounded-xl border border-slate-700/90 bg-slate-900/95 p-2.5 shadow-xl backdrop-blur"
+            id="map-info-panel"
           >
-            切换图源
-          </button>
-        </div>
+            <div className="flex items-center justify-between gap-2 border-b border-slate-700/80 pb-1.5">
+              <span className="truncate text-[11px] font-bold text-emerald-400">
+                {mapSource.label}
+              </span>
+              <button
+                className="shrink-0 rounded border border-emerald-700/80 bg-emerald-950/90 px-2 py-0.5 text-[10px] text-emerald-300 transition hover:bg-emerald-900"
+                onClick={onCycleMapSource}
+                type="button"
+              >
+                切换图源
+              </button>
+            </div>
 
-        <div className="flex items-center justify-between gap-2">
-          <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-200">
-            <i className="fa-solid fa-mountain text-emerald-400" /> 等高线叠加
-          </span>
-          <button
-            aria-pressed={contourEnabled}
-            className={`relative h-5 w-9 shrink-0 rounded-full transition ${
-              contourEnabled ? 'bg-emerald-600' : 'bg-slate-700'
-            }`}
-            onClick={() => onToggleContour(!contourEnabled)}
-            type="button"
-          >
-            <span
-              className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${
-                contourEnabled ? 'left-[18px]' : 'left-0.5'
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-200">
+                <i className="fa-solid fa-mountain text-emerald-400" /> 等高线叠加
+              </span>
+              <button
+                aria-pressed={contourEnabled}
+                className={`relative h-5 w-9 shrink-0 rounded-full transition ${
+                  contourEnabled ? 'bg-emerald-600' : 'bg-slate-700'
+                }`}
+                onClick={() => onToggleContour(!contourEnabled)}
+                type="button"
+              >
+                <span
+                  className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${
+                    contourEnabled ? 'left-[18px]' : 'left-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-[10px] text-slate-400">强度</span>
+              <input
+                aria-label="等高线叠加强度"
+                className="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-slate-700 accent-emerald-500"
+                disabled={!contourEnabled}
+                max="1"
+                min="0.1"
+                onChange={(event) =>
+                  onContourOpacityChange(Number(event.target.value))
+                }
+                step="0.05"
+                type="range"
+                value={contourOpacity}
+              />
+              <span className="w-7 text-right font-mono text-[9px] text-slate-400">
+                {Math.round(contourOpacity * 100)}%
+              </span>
+            </div>
+
+            <div
+              className={`mt-2 flex items-center gap-1.5 rounded-lg px-2 py-1 text-[10px] ${
+                contourStatus === 'ready'
+                  ? 'bg-emerald-950/60 text-emerald-300'
+                  : contourStatus === 'error'
+                    ? 'bg-rose-950/60 text-rose-300'
+                    : 'bg-slate-800/80 text-slate-400'
               }`}
-            />
-          </button>
-        </div>
+            >
+              <i
+                className={`fa-solid ${
+                  contourStatus === 'loading'
+                    ? 'fa-spinner animate-spin'
+                    : contourStatus === 'error'
+                      ? 'fa-triangle-exclamation'
+                      : 'fa-circle-check'
+                }`}
+              />
+              {CONTOUR_STATUS_LABEL[contourStatus]}
+            </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-slate-400">强度</span>
-          <input
-            aria-label="等高线叠加强度"
-            className="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-slate-700 accent-emerald-500"
-            disabled={!contourEnabled}
-            max="1"
-            min="0.1"
-            onChange={(event) => onContourOpacityChange(Number(event.target.value))}
-            step="0.05"
-            type="range"
-            value={contourOpacity}
-          />
-          <span className="w-7 text-right font-mono text-[9px] text-slate-400">
-            {Math.round(contourOpacity * 100)}%
-          </span>
-        </div>
-
-        <div
-          className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-[10px] ${
-            contourStatus === 'ready'
-              ? 'bg-emerald-950/60 text-emerald-300'
-              : contourStatus === 'error'
-                ? 'bg-rose-950/60 text-rose-300'
-                : 'bg-slate-800/80 text-slate-400'
-          }`}
-        >
-          <i
-            className={`fa-solid ${
-              contourStatus === 'loading'
-                ? 'fa-spinner animate-spin'
-                : contourStatus === 'error'
-                  ? 'fa-triangle-exclamation'
-                  : 'fa-circle-check'
-            }`}
-          />
-          {CONTOUR_STATUS_LABEL[contourStatus]}
-        </div>
-
-        <div className="text-[9px] leading-relaxed text-slate-500">
-          AWS Terrain 地形数据 · 本地生成 · 50m 间隔
-        </div>
-        {contourStatus === 'ready' && (
-          <div className="flex items-center gap-2 text-[9px] text-slate-500">
-            <span className="h-px w-4 bg-amber-400" /> 整百米
-            <span className="h-px w-4 bg-slate-300/80" /> 五十米
+            <div className="mt-2 text-[9px] leading-relaxed text-slate-500">
+              AWS Terrain 地形数据 · 本地生成 · 50m 间隔
+            </div>
+            {contourStatus === 'ready' && (
+              <div className="mt-1 flex items-center gap-2 text-[9px] text-slate-500">
+                <span className="h-px w-4 bg-amber-400" /> 整百米
+                <span className="h-px w-4 bg-slate-300/80" /> 五十米
+              </div>
+            )}
+            <div className="mt-2 flex flex-col gap-1.5 border-t border-slate-700/70 pt-2 text-[9px] text-slate-400">
+              <span className="flex items-center gap-2">
+                <span
+                  className="h-0.5 w-5 border-t-2 border-dashed"
+                  style={{ borderColor: '#38bdf8' }}
+                />
+                目标运动路径
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="h-0.5 w-5 bg-emerald-500" /> 已走路径
+              </span>
+            </div>
           </div>
         )}
-        <div className="flex flex-col gap-1.5 border-t border-slate-700/70 pt-2 text-[9px] text-slate-400">
-          <span className="flex items-center gap-2">
-            <span
-              className="h-0.5 w-5 border-t-2 border-dashed"
-              style={{ borderColor: '#38bdf8' }}
-            />
-            目标运动路径
-          </span>
-          <span className="flex items-center gap-2">
-            <span className="h-0.5 w-5 bg-emerald-500" /> 已走路径
-          </span>
-        </div>
-      </div>
 
-      <div className="absolute right-3 top-3 z-20 flex flex-col gap-2">
-        <button
-          className="rounded-xl border border-slate-700 bg-slate-900/90 p-3 text-emerald-400 shadow-lg backdrop-blur transition active:scale-95"
-          onClick={onCycleMapSource}
-          title="切换图源"
-          type="button"
-        >
-          <i className="fa-solid fa-layer-group text-lg" />
-        </button>
-        <button
-          className="rounded-xl border border-slate-700 bg-slate-900/90 p-3 text-emerald-400 shadow-lg backdrop-blur transition active:scale-95"
-          onClick={() => {
-            if (mapInstance && currentPosition) {
-              mapInstance.setView(
-                [currentPosition.lat, currentPosition.lng],
-                Math.max(mapInstance.getZoom(), 16),
-              );
-            } else {
-              onLocateRequest?.();
-            }
-          }}
-          title="定位当前"
-          type="button"
-        >
-          <i className="fa-solid fa-crosshairs text-lg" />
-        </button>
-        <button
-          className="rounded-xl border border-slate-700 bg-slate-900/90 p-3 text-amber-400 shadow-lg backdrop-blur transition active:scale-95"
-          onClick={() => onOpenPoi?.()}
-          title="打点营地/水源"
-          type="button"
-        >
-          <i className="fa-solid fa-map-pin text-lg" />
-        </button>
+        <div className="flex flex-col gap-2">
+          <button
+            aria-controls="map-info-panel"
+            aria-expanded={isMapInfoOpen}
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900/90 px-2.5 py-2 text-[11px] font-semibold text-slate-200 shadow-lg backdrop-blur transition active:scale-95"
+            onClick={() => setIsMapInfoOpen((open) => !open)}
+            title="地图信息"
+            type="button"
+          >
+            <i className="fa-solid fa-satellite-dish text-xs text-emerald-400" />
+            <span>{mapSource.shortLabel}</span>
+            <i
+              className={`fa-solid ${
+                isMapInfoOpen ? 'fa-chevron-up' : 'fa-chevron-down'
+              } text-[8px] text-slate-400`}
+            />
+          </button>
+          <button
+            className="rounded-xl border border-slate-700 bg-slate-900/90 p-3 text-emerald-400 shadow-lg backdrop-blur transition active:scale-95"
+            onClick={onCycleMapSource}
+            title="切换图源"
+            type="button"
+          >
+            <i className="fa-solid fa-layer-group text-lg" />
+          </button>
+          <button
+            className="rounded-xl border border-slate-700 bg-slate-900/90 p-3 text-emerald-400 shadow-lg backdrop-blur transition active:scale-95"
+            onClick={() => {
+              if (mapInstance && currentPosition) {
+                mapInstance.setView(
+                  [currentPosition.lat, currentPosition.lng],
+                  Math.max(mapInstance.getZoom(), 16),
+                );
+              } else {
+                onLocateRequest?.();
+              }
+            }}
+            title="定位当前"
+            type="button"
+          >
+            <i className="fa-solid fa-crosshairs text-lg" />
+          </button>
+          <button
+            className="rounded-xl border border-slate-700 bg-slate-900/90 p-3 text-amber-400 shadow-lg backdrop-blur transition active:scale-95"
+            onClick={() => onOpenPoi?.()}
+            title="打点营地/水源"
+            type="button"
+          >
+            <i className="fa-solid fa-map-pin text-lg" />
+          </button>
+        </div>
       </div>
 
       {currentElevation !== null && (
