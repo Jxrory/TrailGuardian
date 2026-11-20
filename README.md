@@ -2,7 +2,7 @@
 
 一个面向户外徒步、越野与登山场景的 React 单页应用。以“轨迹工作空间”为单位管理每次外出计划，提供卫星地图、等高线、GPS 轨迹记录、设备方向指南针、GPX 导入导出、点位标注和独立的离线地图管理。
 
-当前正式版本为 `1.0.0`，版本变更记录见 [VERSION.md](./VERSION.md)；面向开发 Agent 的协作约定见 [AGENTS.md](./AGENTS.md)。
+当前正式版本为 `1.0.0`，版本变更记录见 [VERSION.md](./VERSION.md)；面向开发 Agent 的协作约定见 [AGENTS.md](./AGENTS.md)。Android Kotlin 原生重做的功能规格见 [docs/ANDROID_NATIVE_SPEC.md](./docs/ANDROID_NATIVE_SPEC.md)。
 
 ## 功能
 

@@ -1,6 +1,14 @@
 # TrailGuardian Agent 协作约定
 
-本文件面向在本仓库工作的开发 Agent。开始修改前先阅读本文件、`VERSION.md` 和 `README.md`，并以当前代码实现为准。
+本文件面向在本仓库工作的开发 Agent。开始修改前先阅读本文件、`VERSION.md` 和 `README.md`，并以当前代码实现为准。涉及 Android Kotlin 原生重做时，还必须先阅读 `docs/ANDROID_NATIVE_SPEC.md`。
+
+## Android 原生重做
+
+- 目标形态为仅 Android 的 Kotlin + Jetpack Compose 原生 App；当前 React / Web 版本是实现行为和交互语义的基线。
+- 重做规格、数据模型、记录算法、地图/离线地图规则和验收标准以 `docs/ANDROID_NATIVE_SPEC.md` 为准。
+- Android 后台轨迹必须使用前台定位服务并持久化点位，不得移植静音音频、Web Locks 或“页面隐藏后停止采样”的 Web 保活方案。
+- Web 端的 LocalStorage / IndexedDB 不会被 Android 自动读取；无损迁移需要先设计导出导入格式。
+- 迁移完成前不要删除或弱化 Web 版本，除非用户明确要求下线。
 
 ## 项目定位
 

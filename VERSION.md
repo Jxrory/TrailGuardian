@@ -24,7 +24,8 @@
 
 ### 未发布改动
 
-暂无。
+- 文档：新增 `docs/ANDROID_NATIVE_SPEC.md`，整理 Android Kotlin 原生重做所需的页面、数据模型、记录算法、离线地图规则和验收标准。
+- 文档：在 `README.md` 与 `AGENTS.md` 中增加 Android 原生重建规格入口和协作约定。
 
 ### 1.0.0 - 2026-11-19 - 正式版
 
